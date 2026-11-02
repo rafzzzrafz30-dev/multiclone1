@@ -5,6 +5,9 @@ import android.os.Bundle;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.ShortcutInfo;
+import android.content.pm.ShortcutManager;
+import android.graphics.drawable.Icon;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.*;
@@ -21,7 +24,6 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         pm = getPackageManager();
 
         LinearLayout layout = new LinearLayout(this);
@@ -36,7 +38,7 @@ public class MainActivity extends Activity {
         layout.addView(title);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("Kelola aplikasi favoritmu");
+        subtitle.setText("Pilih aplikasi untuk membuat pintasan");
         subtitle.setTextColor(Color.LTGRAY);
         layout.addView(subtitle);
 
@@ -44,7 +46,6 @@ public class MainActivity extends Activity {
         layout.addView(listView);
 
         userApps = new ArrayList<>();
-
         List<ApplicationInfo> apps =
             pm.getInstalledApplications(0);
 
@@ -73,8 +74,7 @@ public class MainActivity extends Activity {
             }
 
             public android.view.View getView(
-                int position,
-                android.view.View oldView,
+                int position, android.view.View oldView,
                 ViewGroup parent
             ) {
                 LinearLayout row = new LinearLayout(MainActivity.this);
@@ -86,7 +86,6 @@ public class MainActivity extends Activity {
                 icon.setImageDrawable(
                     pm.getApplicationIcon(userApps.get(position))
                 );
-
                 row.addView(icon,
                     new LinearLayout.LayoutParams(55, 55));
 
@@ -96,8 +95,8 @@ public class MainActivity extends Activity {
                 name.setTextSize(17);
                 name.setTextColor(Color.WHITE);
                 name.setPadding(18, 0, 0, 0);
-
                 row.addView(name);
+
                 return row;
             }
         };
@@ -105,14 +104,38 @@ public class MainActivity extends Activity {
         listView.setAdapter(adapter);
 
         listView.setOnItemClickListener((parent, view, position, id) -> {
-            String packageName = userApps.get(position).packageName;
-            Intent launch = pm.getLaunchIntentForPackage(packageName);
-
-            if (launch != null) {
-                startActivity(launch);
-            }
+            ApplicationInfo app = userApps.get(position);
+            createShortcut(app);
         });
 
         setContentView(layout);
+    }
+
+    private void createShortcut(ApplicationInfo app) {
+        ShortcutManager manager =
+            getSystemService(ShortcutManager.class);
+
+        if (manager == null ||
+            !manager.isRequestPinShortcutSupported()) {
+            Toast.makeText(this,
+                "Peluncur HP tidak mendukung pintasan",
+                Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        Intent launch = pm.getLaunchIntentForPackage(app.packageName);
+        if (launch == null) return;
+
+        String label = pm.getApplicationLabel(app).toString();
+
+        ShortcutInfo shortcut = new ShortcutInfo.Builder(
+            this, "shortcut_" + app.packageName)
+            .setShortLabel(label)
+            .setIcon(Icon.createWithResource(
+                this, android.R.drawable.ic_menu_view))
+            .setIntent(launch)
+            .build();
+
+        manager.requestPinShortcut(shortcut, null);
     }
 }
